@@ -1,0 +1,13 @@
+# Secrets & runtime data — jangan commit
+grabber/config_keys.json
+grabber/logs/
+modules/__pycache__/
+__pycache__/
+*.pyc
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
