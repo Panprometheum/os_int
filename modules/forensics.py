@@ -1,6 +1,6 @@
 """forensics.py - EXIF, metadata, domain/whois, DNS.
 
-Semua fungsi balikin {ok, data, source, error}.
+All functions return {ok, data, source, error}.
 """
 from __future__ import annotations
 
@@ -15,13 +15,13 @@ from datetime import datetime
 # --------------------------------------------------------------------------
 def exif_image(path: str) -> dict:
     if not os.path.isfile(path):
-        return {"ok": False, "source": "exif", "error": "file tidak ada"}
+        return {"ok": False, "source": "exif", "error": "file not found"}
 
     try:
         from PIL import Image
         from PIL.ExifTags import TAGS, GPSTAGS
     except ImportError:
-        return {"ok": False, "source": "exif", "error": "Pillow tidak terpasang"}
+        return {"ok": False, "source": "exif", "error": "Pillow not installed"}
 
     out = {"file": path, "size": os.path.getsize(path),
            "md5": _hash(path, "md5"), "sha256": _hash(path, "sha256")}
@@ -101,7 +101,7 @@ def domain_whois(domain: str) -> dict:
     try:
         import whois
     except ImportError:
-        return {"ok": False, "source": "whois", "error": "python-whois tidak terpasang"}
+        return {"ok": False, "source": "whois", "error": "python-whois not installed"}
     try:
         w = whois.whois(domain)
         data = {}
@@ -124,7 +124,7 @@ def dns_records(domain: str) -> dict:
     try:
         import dns.resolver
     except ImportError:
-        return {"ok": False, "source": "dns", "error": "dnspython tidak terpasang"}
+        return {"ok": False, "source": "dns", "error": "dnspython not installed"}
     out = {}
     for rtype in ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA"]:
         try:
@@ -142,7 +142,7 @@ def subdomains(domain: str, wordlist: list[str] | None = None) -> dict:
     try:
         import dns.resolver
     except ImportError:
-        return {"ok": False, "source": "subdomain", "error": "dnspython tidak terpasang"}
+        return {"ok": False, "source": "subdomain", "error": "dnspython not installed"}
 
     words = wordlist or [
         "www", "mail", "ftp", "webmail", "smtp", "pop", "ns1", "ns2", "dns",
@@ -166,7 +166,7 @@ def subdomains(domain: str, wordlist: list[str] | None = None) -> dict:
 
 
 # --------------------------------------------------------------------------
-# 5. Email harvesting dari halaman web (harvester minimal)
+# 5. Email harvesting from web pages (minimal harvester)
 # --------------------------------------------------------------------------
 def harvest_emails(domain: str) -> dict:
     import re

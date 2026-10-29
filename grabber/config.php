@@ -1,19 +1,10 @@
 <?php
 // grabber/config.php
-// Konfigurasi grabber + resolvers + API keys.
-// Bisa diedit manual ATAU lewat Settings panel di dashboard (tersimpan di config_keys.json).
+// Resolver + API key configuration.
+// Editable manually OR via the dashboard Settings panel (stored in config_keys.json).
 
 $cfg = [
-    // === Grabber ===
-    'title'      => 'Cek Kuota & Paket Data',
-    'subtitle'   => 'Masukkan nomor untuk mengecek sisa kuota Anda',
-    'redirect'   => 'https://www.indosat.com/',
-    'log_dir'    => __DIR__ . '/logs',
-    'geo_api'    => 'http://ip-api.com/json/',
-    'tg_bot_token' => '',
-    'tg_chat_id'   => '',
-
-    // === Resolvers (nomor -> akun medsos) ===
+    // === Resolvers (number -> social accounts) ===
     'truecaller_cookie' => '',
     'serpapi_key'       => '',
     'searxng_instance'  => '',
@@ -36,13 +27,13 @@ $cfg = [
     'opencorp_token'    => '',
     'ch_key'            => '',   // UK Companies House
 
-    // === Keamanan dashboard ===
-    // Settings panel (simpan API key) hanya bisa POST dari localhost.
-    // Set true kalau dashboard di-hosting publik + sudah diproteksi (auth/reverse-proxy).
+    // === Dashboard security ===
+    // Settings panel (saves API keys) only accepts POST from localhost.
+    // Set true if the dashboard is publicly hosted + already protected (auth/reverse-proxy).
     'allow_remote_settings' => false,
 ];
 
-// Override dari config_keys.json (Settings panel) kalau ada
+// Override from config_keys.json (Settings panel) if present
 $keysFile = __DIR__ . '/config_keys.json';
 if (is_file($keysFile)) {
     $saved = json_decode(file_get_contents($keysFile), true);

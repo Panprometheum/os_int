@@ -1,33 +1,13 @@
 <?php
 // osint/grabber/index_console.php  (served as the one dashboard)
-// Single-page OSINT Console: Phone OSINT (auto-resolve) + Tools + Grabber.
-
-$logFile = __DIR__ . '/logs/hits.jsonl';
-$rows = [];
-if (is_file($logFile)) {
-    foreach (file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-        $j = json_decode($line, true);
-        if (is_array($j)) $rows[] = $j;
-    }
-}
-$rows = array_reverse($rows);
-
-function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES); }
-function latlon($r) {
-    $lat = $r['lat'] ?? ($r['geo']['lat'] ?? null);
-    $lon = $r['lon'] ?? ($r['geo']['lon'] ?? null);
-    return (is_numeric($lat) && is_numeric($lon)) ? [$lat, $lon] : null;
-}
-$hitCount = count($rows);
-$gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_location'));
+// Single-page OSINT Console: Phone OSINT (auto-resolve) + Tools.
 ?>
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OSINT Console</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
   /* ===== TERMINAL RETRO — AMBER CRT ===== */
   :root{
@@ -183,12 +163,9 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
   <div class="tabs">
     <div class="tab active" data-view="phone">Phone OSINT</div>
     <div class="tab" data-view="tools">Tools</div>
-    <div class="tab" data-view="grabber">Grabber</div>
   </div>
   <div class="spacer"></div>
-  <span class="badge"><?= $hitCount ?> hit</span>
-  <span class="badge loc"><?= $gpsCount ?> GPS</span>
-  <button class="btn" id="btn-phosphor" title="ganti warna fosfor">◧ GREEN</button>
+  <button class="btn" id="btn-phosphor" title="switch phosphor color">◧ GREEN</button>
   <button class="btn" id="btn-sound" title="beep on/off">♪ SOUND</button>
   <button class="btn" id="btn-settings" title="API keys">⚙ KEYS</button>
   <button class="btn" onclick="location.reload()">⟳ REFRESH</button>
@@ -199,12 +176,12 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
   <div class="card" style="max-width:640px;margin:60px auto;position:relative">
     <h3>API Keys / Settings</h3>
     <p style="color:var(--mut);font-size:13px;margin:0 0 14px">
-      Kosongkan = tidak berubah. Isi lalu SIMPAN. Tersimpan di <code>config_keys.json</code>.
+      Leave empty = no change. Fill in then SAVE. Stored in <code>config_keys.json</code>.
     </p>
     <div id="settings-fields"></div>
     <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn acc" id="btn-save-keys">SIMPAN</button>
-      <button class="btn" id="btn-close-settings">TUTUP</button>
+      <button class="btn acc" id="btn-save-keys">SAVE</button>
+      <button class="btn" id="btn-close-settings">CLOSE</button>
       <span id="settings-msg" style="align-self:center;font-size:14px"></span>
     </div>
   </div>
@@ -215,7 +192,7 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
   <div class="pane">
     <div class="search">
       <input type="tel" id="num" class="grow" placeholder="08xxxxxxxxxx" value="">
-      <button class="btn acc" id="go">Resolve Nomor</button>
+      <button class="btn acc" id="go">Resolve Number</button>
     </div>
     <div class="note" id="cfg-note" style="display:none"></div>
     <div class="card" id="osint-result" style="display:none"></div>
@@ -242,11 +219,11 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
         <option value="subdomain">Subdomain Enum</option>
         <option value="revimg">Reverse Image Links</option>
       </select>
-      <input type="text" id="toolval" class="grow" placeholder="nilai (IP / username / domain / email / nama)">
-      <button class="btn acc" id="toolgo">Jalankan</button>
+      <input type="text" id="toolval" class="grow" placeholder="value (IP / username / domain / email / name)">
+      <button class="btn acc" id="toolgo">Run</button>
     </div>
     <div class="card" id="tool-result" style="display:none"></div>
-    <div class="sec-label">Contoh Cepat</div>
+    <div class="sec-label">Quick Examples</div>
     <div class="toolgrid">
       <div class="toolcard" data-tool="ipintel" data-v="1.1.1.1"><div class="t">IP Intel 1.1.1.1</div><div class="d">shodan+greynoise</div></div>
       <div class="toolcard" data-tool="dev" data-v="torvalds"><div class="t">Dev: torvalds</div><div class="d">12 source</div></div>
@@ -262,44 +239,6 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
   </div>
 </div>
 
-<!-- ===== GRABBER ===== -->
-<div class="view" id="view-grabber">
-  <div class="wrap">
-    <div class="table">
-      <?php if (!$rows): ?>
-        <div class="empty">Belum ada data grabber. Landing page di <code>/index.php</code> — kirim link ke target, hits muncul di sini.</div>
-      <?php else: ?>
-      <table>
-        <thead><tr><th>Waktu</th><th>Tipe</th><th>IP</th><th>Lokasi</th><th>ISP</th><th>Telp</th></tr></thead>
-        <tbody>
-        <?php foreach ($rows as $i => $r):
-          $type = $r['type'] ?? '?';
-          $cls  = $type === 'precise_location' ? 'loc' : ($type === 'fingerprint' ? 'fp' : 'hit');
-          $ll   = latlon($r);
-          $city = $r['geo']['city'] ?? ''; $ctry = $r['geo']['country'] ?? ''; $isp = $r['geo']['isp'] ?? '';
-        ?>
-          <tr class="row" data-i="<?= $i ?>">
-            <td class="ts"><?= e(substr($r['ts'] ?? '', 0, 19)) ?></td>
-            <td><span class="badge <?= $cls ?>"><?= e($type) ?></span><?php if($ll): ?><span class="flag gps">GPS</span><?php endif; ?></td>
-            <td class="ip"><?= e($r['ip'] ?? '') ?></td>
-            <td><?= e(trim($city . ($ctry ? ', '.$ctry : ''), ', ')) ?></td>
-            <td><?= e($isp) ?></td>
-            <td class="ip"><?= e($r['phone'] ?? '') ?></td>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-      <?php endif; ?>
-    </div>
-    <div class="side">
-      <div id="map"></div>
-      <div class="pad detail" id="detail"><div class="empty">Klik baris untuk detail.</div></div>
-    </div>
-  </div>
-</div>
-
-<script id="data" type="application/json"><?= json_encode($rows, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP) ?></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ===== CRT: boot sequence, phosphor toggle, sound, settings =====
 (function(){
@@ -374,7 +313,7 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
 
   // --- settings ---
   const FIELD_DEFS = [
-    ['truecaller_cookie','Truecaller cookie','nama=nilai; ...', true],
+    ['truecaller_cookie','Truecaller cookie','name=value; ...', true],
     ['serpapi_key','SerpAPI key','search engine', false],
     ['searxng_instance','SearXNG instance','https://...', false],
     ['shodan_key','Shodan API key','ipintel', false],
@@ -389,8 +328,6 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
     ['emailrep_key','EmailRep key','email', false],
     ['opencorp_token','OpenCorporates token','business', false],
     ['ch_key','Companies House key','business UK', false],
-    ['tg_bot_token','Telegram bot token','notif', false],
-    ['tg_chat_id','Telegram chat id','notif', false],
   ];
   const modal = document.getElementById('settings-modal');
   const fields = document.getElementById('settings-fields');
@@ -398,7 +335,7 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
 
   document.getElementById('btn-settings').addEventListener('click', async function(){
     msg.textContent = '';
-    fields.innerHTML = '<div><span class="spin"></span>memuat status...</div>';
+    fields.innerHTML = '<div><span class="spin"></span>loading status...</div>';
     modal.style.display = 'block';
     beep(600,0.05);
     let status = {};
@@ -406,11 +343,11 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
     let h = '<div class="grid" style="grid-template-columns:1fr">';
     FIELD_DEFS.forEach(([k,label,hint,big])=>{
       const st = status[k] || '';
-      h += `<div class="field"><div class="k">${label} ${st?`<span style="color:var(--green)">[${esc(st)}]</span>`:'<span style="color:var(--mut)">[kosong]</span>'}</div>`;
+      h += `<div class="field"><div class="k">${label} ${st?`<span style="color:var(--green)">[${esc(st)}]</span>`:'<span style="color:var(--mut)">[empty]</span>'}</div>`;
       h += big
         ? `<textarea data-k="${k}" placeholder="${hint}" rows="2" style="width:100%;background:#0e0901;color:var(--amber);border:1px solid var(--line);font-family:inherit;font-size:14px;padding:8px"></textarea>`
         : `<input data-k="${k}" placeholder="${hint}" style="width:100%">`;
-      h += `<div style="font-size:11px;color:var(--mut);margin-top:3px">kosongkan=tidak berubah</div></div>`;
+      h += `<div style="font-size:11px;color:var(--mut);margin-top:3px">empty=no change</div></div>`;
     });
     h += '</div>';
     fields.innerHTML = h;
@@ -419,13 +356,13 @@ $gpsCount = count(array_filter($rows, fn($r) => ($r['type'] ?? '') === 'precise_
   document.getElementById('btn-save-keys').addEventListener('click', async function(){
     const body = {};
     fields.querySelectorAll('[data-k]').forEach(el=>{ if(el.value.trim() !== '') body[el.dataset.k] = el.value.trim(); });
-    if (!Object.keys(body).length){ msg.textContent = 'tidak ada perubahan'; msg.style.color='var(--warn)'; return; }
-    msg.innerHTML = '<span class="spin"></span>menyimpan...'; msg.style.color='';
+    if (!Object.keys(body).length){ msg.textContent = 'no changes'; msg.style.color='var(--warn)'; return; }
+    msg.innerHTML = '<span class="spin"></span>saving...'; msg.style.color='';
     try{
       const r = await fetch('api_settings.php', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
       const j = await r.json();
-      if(j.ok){ msg.textContent = 'tersimpan: ' + (j.changed||[]).join(', '); msg.style.color='var(--green)'; beep(880,0.08); setTimeout(()=>location.reload(),1200); }
-      else { msg.textContent = 'gagal: ' + j.error; msg.style.color='var(--red)'; beep(200,0.15); }
+      if(j.ok){ msg.textContent = 'saved: ' + (j.changed||[]).join(', '); msg.style.color='var(--green)'; beep(880,0.08); setTimeout(()=>location.reload(),1200); }
+      else { msg.textContent = 'failed: ' + j.error; msg.style.color='var(--red)'; beep(200,0.15); }
     }catch(e){ msg.textContent = 'error: '+e; msg.style.color='var(--red)'; }
   });
 
@@ -439,40 +376,7 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
   t.classList.add('active');
   document.getElementById('view-' + t.dataset.view).classList.add('active');
-  if (t.dataset.view === 'grabber') setTimeout(() => map.invalidateSize(), 100);
 }));
-
-// ---- Grabber map ----
-const ROWS = JSON.parse(document.getElementById('data').textContent);
-const map = L.map('map').setView([-2.5, 118], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© OSM'}).addTo(map);
-const layer = L.layerGroup().addTo(map);
-function ll(r){ const lat=r.lat??(r.geo&&r.geo.lat), lon=r.lon??(r.geo&&r.geo.lon); return (lat!=null&&lon!=null&&!isNaN(lat)&&!isNaN(lon))?[Number(lat),Number(lon)]:null; }
-ROWS.forEach(r => { const p=ll(r); if(!p)return; const prec=r.type==='precise_location';
-  L.circleMarker(p,{radius:prec?9:6,color:prec?'#ff2d55':'#7cc4ff',fillColor:prec?'#ff2d55':'#7cc4ff',fillOpacity:.85,weight:2}).addTo(layer)
-   .bindPopup(`<b>${r.type}</b><br>${r.ip||''}<br>${(r.geo&&r.geo.city)||''}`);
-});
-const rowEls = document.querySelectorAll('tr.row');
-rowEls.forEach(tr => tr.addEventListener('click', () => {
-  rowEls.forEach(x => x.classList.remove('sel')); tr.classList.add('sel');
-  const r = ROWS[Number(tr.dataset.i)]; const p = ll(r);
-  if (p) map.setView(p, r.type==='precise_location'?16:9);
-  renderDetail(r);
-}));
-function rrow(k,v){ if(v===''||v==null)return''; return `<div class="kv"><b>${k}</b><span>${String(v).replace(/</g,'&lt;')}</span></div>`; }
-function renderDetail(r){
-  const g=r.geo||{}; const p=ll(r);
-  let h=`<h2>Detail Event</h2>`;
-  h+=rrow('Tipe',r.type); h+=rrow('Waktu',r.ts); h+=rrow('IP',r.ip);
-  h+=rrow('ISP',g.isp); h+=rrow('Org',g.org); h+=rrow('Kota',g.city); h+=rrow('Region',g.regionName); h+=rrow('Negara',g.country);
-  h+=rrow('Mobile',g.mobile?'ya':'tidak'); h+=rrow('Proxy/VPN',g.proxy?'YA':'tidak'); h+=rrow('Hosting',g.hosting?'ya':'tidak');
-  if(p){ h+=rrow('GPS',`${Number(p[0]).toFixed(6)}, ${Number(p[1]).toFixed(6)}`); h+=rrow('Accuracy', r.acc?r.acc+' m':'');
-    h+=`<div class="kv"><b>Maps</b><a target="_blank" style="color:#7cc4ff" href="https://www.google.com/maps?q=${p[0]},${p[1]}">buka Google Maps</a></div>`; }
-  h+=rrow('Telp',r.phone); h+=rrow('UA',r.ua); h+=rrow('Platform',r.platform); h+=rrow('Bahasa',r.lang);
-  h+=rrow('TZ',r.tzo); h+=rrow('Screen',r.screen); h+=rrow('Fingerprint',r.visitor_id);
-  document.getElementById('detail').innerHTML=h;
-}
-if (ROWS.length) document.querySelector('tr.row')?.click();
 
 // ---- helpers ----
 function field(k,v){ return `<div class="field"><div class="k">${k}</div><div class="v">${(v==null||v==='')?'—':String(v).replace(/</g,'&lt;')}</div></div>`; }
@@ -492,7 +396,7 @@ async function resolvePhone(){
   const num = numEl.value.trim();
   if(!/\d{6,}/.test(num)) return;
   res.style.display='block';
-  res.innerHTML = `<h3>Memproses ${esc(num)}</h3><div><span class="spin"></span>menjalankan resolver (telegram, truecaller, pivot, search)</div>`;
+  res.innerHTML = `<h3>Processing ${esc(num)}</h3><div><span class="spin"></span>running resolvers (telegram, truecaller, pivot, search)</div>`;
   try{
     const j = await api('resolve', num);
     if(!j.ok){ res.innerHTML = `<h3>Error</h3><pre>${esc(j.error)}</pre>`; return; }
@@ -504,16 +408,16 @@ numEl.addEventListener('keydown', e => { if(e.key==='Enter') resolvePhone(); });
 
 function renderPhone(d){
   const n = d.normalized; const p = d.profile || {}; const rz = p.resolved || {};
-  let h = `<h3>Identitas — ${esc(n.e164)}</h3><div class="grid">`;
+  let h = `<h3>Identity — ${esc(n.e164)}</h3><div class="grid">`;
   h += field('Operator', d.operator);
-  h += field('Region (historis)', d.region);
+  h += field('Region (historic)', d.region);
   h += field('E.164', n.e164);
-  h += field('Lokal', n.pretty);
+  h += field('Local', n.pretty);
   if(p.phonenumbers){
     h += field('Carrier (lib)', p.phonenumbers.carrier);
-    h += field('Tipe', p.phonenumbers.number_type);
+    h += field('Type', p.phonenumbers.number_type);
     h += field('Timezone', (p.phonenumbers.timezones||[]).join(', '));
-    h += field('Valid', p.phonenumbers.is_valid?'ya':'tidak');
+    h += field('Valid', p.phonenumbers.is_valid?'yes':'no');
   }
   h += `</div>`;
 
@@ -532,11 +436,11 @@ function renderPhone(d){
     const byN = tg.by_number && tg.by_number.data;
     if(byU && byU.display_name && !/Era baru mengirim pesan/.test(byU.display_name)){
       h += `<div class="tgcard"><img src="${byU.avatar||''}" onerror="this.style.visibility='hidden'"><div><div class="n">${esc(byU.display_name)}</div><div class="b">@${esc(byU.username)}</div><div class="b">${esc(byU.bio||'')}</div></div></div>`;
-      h += `<div class="links"><a target="_blank" href="${byU.url}">buka profil</a></div>`;
+      h += `<div class="links"><a target="_blank" href="${byU.url}">open profile</a></div>`;
     } else {
-      h += `<div class="result-item"><div><div class="tt">Tidak ada profil Telegram langsung</div><div class="ss">${byN&&byN.generic?'nomor tidak terhubung ke akun publik':''}</div></div><a class="go" target="_blank" href="https://t.me/+${n.intl}">cek manual</a></div>`;
+      h += `<div class="result-item"><div><div class="tt">No direct Telegram profile</div><div class="ss">${byN&&byN.generic?'number not linked to a public account':''}</div></div><a class="go" target="_blank" href="https://t.me/+${n.intl}">check manually</a></div>`;
     }
-  } else h += `<div class="empty">tidak ada data</div>`;
+  } else h += `<div class="empty">no data</div>`;
 
   // === Truecaller ===
   h += `<h3>Truecaller</h3>`;
@@ -545,20 +449,20 @@ function renderPhone(d){
     const t = tc.data;
     if(t.name || t.raw){
       h += `<div class="grid">`;
-      if(t.name) h += field('Nama', t.name);
-      if(t.raw && t.raw.name) h += field('Nama (raw)', t.raw.name);
+      if(t.name) h += field('Name', t.name);
+      if(t.raw && t.raw.name) h += field('Name (raw)', t.raw.name);
       h += `</div>`;
     } else if(t.title && !/Free Reverse Phone/.test(t.title)){
       h += `<div class="grid">` + field('Info', t.title) + `</div>`;
     } else {
-      h += `<div class="result-item"><div><div class="tt">Perlu login</div><div class="ss">isi cookie di config.php buat aktifkan</div></div><a class="go" target="_blank" href="https://www.truecaller.com/search/id/${n.intl}">buka Truecaller</a></div>`;
+      h += `<div class="result-item"><div><div class="tt">Login required</div><div class="ss">set cookie in config.php to enable</div></div><a class="go" target="_blank" href="https://www.truecaller.com/search/id/${n.intl}">open Truecaller</a></div>`;
     }
   } else {
-    h += `<div class="result-item"><div><div class="tt">Belum aktif</div><div class="ss">${esc((tc&&tc.error)||'')}</div></div><a class="go" target="_blank" href="https://www.truecaller.com/search/id/${n.intl}">buka manual</a></div>`;
+    h += `<div class="result-item"><div><div class="tt">Not enabled</div><div class="ss">${esc((tc&&tc.error)||'')}</div></div><a class="go" target="_blank" href="https://www.truecaller.com/search/id/${n.intl}">open manually</a></div>`;
   }
 
   // === Handle pivot ===
-  h += `<h3>Nomor sebagai Handle</h3>`;
+  h += `<h3>Number as Handle</h3>`;
   const hp = rz.handle_pivot && rz.handle_pivot.data;
   if(hp){
     const hits = hp.hits || {};
@@ -568,14 +472,14 @@ function renderPhone(d){
       keys.forEach(pl => hits[pl].forEach(x => { h += `<a class="chip found" target="_blank" href="${x.url}">${pl}: ${esc(x.handle)}</a>`; }));
       h += `</div>`;
     } else {
-      h += `<div class="result-item"><div><div class="tt">Tidak ada handle cocok</div><div class="ss">${hp.checked} dicek</div></div></div>`;
+      h += `<div class="result-item"><div><div class="tt">No matching handles</div><div class="ss">${hp.checked} checked</div></div></div>`;
     }
     if(hp.inconclusive && hp.inconclusive.length){
-      h += `<div style="font-size:11.5px;color:var(--mut);margin-top:6px">perlu cek manual (butuh login):</div><div class="links">`;
+      h += `<div style="font-size:11.5px;color:var(--mut);margin-top:6px">needs manual check (requires login):</div><div class="links">`;
       hp.inconclusive.forEach(x => { h += `<a class="chip inc" target="_blank" href="${x.url}">${x.platform}: ${esc(x.handle)}</a>`; });
       h += `</div>`;
     }
-  } else h += `<div class="empty">tidak ada data</div>`;
+  } else h += `<div class="empty">no data</div>`;
 
   // === Messaging apps ===
   h += `<h3>Messaging Apps</h3>`;
@@ -589,7 +493,7 @@ function renderPhone(d){
     h += `</div>`;
   } else h += `<div class="empty">—</div>`;
 
-  // === Dev profiles (kalau ada username kandidat) ===
+  // === Dev profiles (when candidate usernames exist) ===
   const devKeys = Object.keys(rz).filter(k=>k.startsWith('social_'));
   if(devKeys.length){
     h += `<h3>Social (Jina)</h3>`;
@@ -605,14 +509,14 @@ function renderPhone(d){
   }
 
   // === Search ===
-  h += `<h3>Pencarian</h3>`;
+  h += `<h3>Search</h3>`;
   const se = rz.search && rz.search.data;
   if(se && se.results && se.results.length){
     se.results.forEach(r => {
-      h += `<div class="result-item"><div><div class="tt">${esc(r.title)}</div><div class="uu">${esc(r.url)}</div>${r.snippet?`<div class="ss">${esc(r.snippet)}</div>`:''}</div><a class="go" target="_blank" href="${r.url}">buka</a></div>`;
+      h += `<div class="result-item"><div><div class="tt">${esc(r.title)}</div><div class="uu">${esc(r.url)}</div>${r.snippet?`<div class="ss">${esc(r.snippet)}</div>`:''}</div><a class="go" target="_blank" href="${r.url}">open</a></div>`;
     });
   } else if(se && se.google){
-    h += `<div style="font-size:12px;color:var(--mut);margin-bottom:6px">Search API belum dikonfigurasi — pakai link langsung:</div><div class="links">`;
+    h += `<div style="font-size:12px;color:var(--mut);margin-bottom:6px">Search API not configured — use direct links:</div><div class="links">`;
     for(const [k,v] of Object.entries(se)){ if(k==='query')continue; h += `<a target="_blank" href="${v}">${k}</a>`; }
     h += `</div>`;
   } else h += `<div class="empty">—</div>`;
@@ -620,7 +524,7 @@ function renderPhone(d){
   // === Google Dorks ===
   h += `<h3>Google Dorks</h3>`;
   (d.dorks||[]).forEach(dk => {
-    h += `<div class="result-item"><div class="uu" style="color:var(--txt)">${esc(dk)}</div><a class="go" target="_blank" href="https://www.google.com/search?q=${encodeURIComponent(dk)}">cari</a></div>`;
+    h += `<div class="result-item"><div class="uu" style="color:var(--amber)">${esc(dk)}</div><a class="go" target="_blank" href="https://www.google.com/search?q=${encodeURIComponent(dk)}">search</a></div>`;
   });
 
   return h;
@@ -630,7 +534,7 @@ function renderPhone(d){
 async function runTool(tool, val){
   const tr = document.getElementById('tool-result');
   tr.style.display='block';
-  tr.innerHTML = `<h3>Menjalankan ${esc(tool)}...</h3><div><span class="spin"></span>bekerja</div>`;
+  tr.innerHTML = `<h3>Running ${esc(tool)}...</h3><div><span class="spin"></span>working</div>`;
   try{
     const j = await api(tool, val);
     if(!j.ok){ tr.innerHTML = `<h3>Error</h3><pre>${esc((j.error||'')+'\n'+(j.raw||'')+'\n'+(j.stderr||''))}</pre>`; return; }
@@ -661,11 +565,11 @@ function renderTool(tool, data){
       if(sid.hostnames && sid.hostnames.length){ h += `<h3>Hostnames</h3><div class="links">` + sid.hostnames.map(x=>`<span class="chip">${esc(x)}</span>`).join('') + `</div>`; }
       if(sid.vulns && sid.vulns.length){ h += `<h3>Vulnerabilities</h3><div class="links">` + sid.vulns.map(x=>`<a class="chip" style="background:#2a0d0d;border-color:#7a1f1f;color:#ff8a8a" target="_blank" href="https://nvd.nist.gov/vuln/detail/${esc(x)}">${esc(x)}</a>`).join('') + `</div>`; }
       if(sid.cpes && sid.cpes.length){ h += `<h3>CPE</h3><div class="links">` + sid.cpes.map(x=>`<span class="chip">${esc(x)}</span>`).join('') + `</div>`; }
-    } else { h += `<div class="empty">Shodan InternetDB: tidak ada data publik</div>`; }
+    } else { h += `<div class="empty">Shodan InternetDB: no public data</div>`; }
     const ii = d.ipinfo && d.ipinfo.data;
     if(ii){ h += `<h3>IPinfo</h3><div class="grid">`; for(const [k,v] of Object.entries(ii)){ if(v!=null&&v!=='') h += field(k,v); } h += `</div>`; }
     const gn = d.greynoise && d.greynoise.data;
-    if(gn){ h += `<h3>GreyNoise</h3><div class="grid">` + field('Noise (scanner)', gn.noise?'YA':'tidak') + field('RIOT (benign)', gn.riot?'ya':'tidak') + field('Klasifikasi', gn.classification) + `</div>`; }
+    if(gn){ h += `<h3>GreyNoise</h3><div class="grid">` + field('Noise (scanner)', gn.noise?'YES':'no') + field('RIOT (benign)', gn.riot?'yes':'no') + field('Classification', gn.classification) + `</div>`; }
     const ab = d.abuseipdb && d.abuseipdb.data;
     if(ab){ h += `<h3>AbuseIPDB</h3><div class="grid">` + field('Abuse score', ab.abuseConfidenceScore) + field('Total reports', ab.totalReports) + field('ISP', ab.isp) + `</div>`; }
     return h;
@@ -676,7 +580,7 @@ function renderTool(tool, data){
     const lc = d.leakcheck_public && d.leakcheck_public.data;
     if(lc){
       const found = lc.found || 0;
-      h += `<div class="result-item"><div><div class="tt">LeakCheck (public) — ${found} hasil</div><div class="ss">${esc(lc.message||'')}</div></div></div>`;
+      h += `<div class="result-item"><div><div class="tt">LeakCheck (public) — ${found} results</div><div class="ss">${esc(lc.message||'')}</div></div></div>`;
       if(lc.fields && lc.fields.length){ h += `<h3>Data Fields</h3><div class="links">` + lc.fields.map(f=>`<span class="chip maybe">${esc(f)}</span>`).join('') + `</div>`; }
       if(lc.sources && lc.sources.length){ h += `<h3>Sources</h3><div class="links">` + lc.sources.map(s=>`<span class="chip">${esc(s)}</span>`).join('') + `</div>`; }
     }
@@ -718,7 +622,7 @@ function renderTool(tool, data){
   if(tool==='dev' && data.dev_profiles){
     const d = data.dev_profiles;
     const found = Object.entries(d).filter(([k,v])=>v.found);
-    let h = `<h3>Dev Profiles — ${found.length} ditemukan</h3><div class="links">`;
+    let h = `<h3>Dev Profiles — ${found.length} found</h3><div class="links">`;
     Object.entries(d).forEach(([k,v])=>{ h += `<span class="chip ${v.found?'found':'notfound'}">${k}${v.found?' ✓':''}</span>`; });
     h += `</div>`;
     found.forEach(([k,v])=>{
@@ -737,10 +641,10 @@ function renderTool(tool, data){
     const sm = d._summary || {};
     let h = `<h3>Social Profiles — @${esc(sm.username||'')}</h3>`;
     h += `<div class="grid">`;
-    h += field('Ditemukan', (sm.found||[]).join(', ') || '—');
-    h += field('Kemungkinan', (sm.probable||[]).join(', ') || '—');
-    h += field('Diblokir/login', (sm.blocked||[]).join(', ') || '—');
-    h += field('Dicek', sm.total_checked || 0);
+    h += field('Found', (sm.found||[]).join(', ') || '—');
+    h += field('Likely', (sm.probable||[]).join(', ') || '—');
+    h += field('Blocked/login', (sm.blocked||[]).join(', ') || '—');
+    h += field('Checked', sm.total_checked || 0);
     h += `</div>`;
     Object.entries(d).forEach(([k,v])=>{
       if(k==='_summary' || !v.data) return;
@@ -749,23 +653,23 @@ function renderTool(tool, data){
       const badgeCls = st==='found'?'found':(st==='probable'?'maybe':(st==='blocked'?'inc':'notfound'));
       h += `<h3>${k} <span class="chip ${badgeCls}" style="font-size:11px">${esc(st)}${dd.confidence!=null?(' · '+dd.confidence+'%'):''}</span></h3>`;
       h += `<div class="grid">`;
-      if(dd.display_name) h += field('Nama', dd.display_name);
+      if(dd.display_name) h += field('Name', dd.display_name);
       if(dd.bio) h += field('Bio', dd.bio);
-      if(dd.signals) h += field('Sinyal', dd.signals.join(', '));
-      if(dd.reason) h += field('Catatan', dd.reason);
+      if(dd.signals) h += field('Signals', dd.signals.join(', '));
+      if(dd.reason) h += field('Note', dd.reason);
       h += `</div>`;
-      if(dd.url) h += `<div class="links"><a target="_blank" href="${dd.url}">buka ${k}</a></div>`;
+      if(dd.url) h += `<div class="links"><a target="_blank" href="${dd.url}">open ${k}</a></div>`;
     });
     return h;
   }
   if(tool==='emailintel' && data.email_intel){
     const d = data.email_intel;
     let h = `<h3>Email Intelligence</h3>`;
-    // Hudson Rock (paling penting)
+    // Hudson Rock (most important)
     const hr = d.hudson_rock;
     if(hr && hr.ok){
       const infected = hr.data.infected;
-      h += `<div class="result-item"><div><div class="tt">Hudson Rock — Info Stealer</div><div class="ss" style="color:${infected?'var(--acc)':'var(--ok)'}">${infected?'TERINFEKSI info-stealer!':'bersih'}</div></div></div>`;
+      h += `<div class="result-item"><div><div class="tt">Hudson Rock — Info Stealer</div><div class="ss" style="color:${infected?'#ff5b3d':'var(--ok)'}">${infected?'INFECTED with info-stealer!':'clean'}</div></div></div>`;
       if(infected && hr.data.stealers){
         h += `<div class="links">`;
         hr.data.stealers.forEach(s=>{ h += `<span class="chip" style="background:#3a1a1a;border-color:#6b1f1f;color:#ff8a8a">${esc(s.computer||'PC')} · ${esc(s.date||'')} · ${esc(s.ip||'')}</span>`; });
@@ -775,7 +679,7 @@ function renderTool(tool, data){
     // Gravatar
     const gv = d.gravatar;
     if(gv && gv.ok && gv.data.found){
-      h += `<h3>Gravatar</h3><div class="grid">` + field('Nama', gv.data.display_name) + field('About', gv.data.about) + `</div>`;
+      h += `<h3>Gravatar</h3><div class="grid">` + field('Name', gv.data.display_name) + field('About', gv.data.about) + `</div>`;
       if(gv.data.accounts && gv.data.accounts.length){
         h += `<div class="links">`;
         gv.data.accounts.forEach(a=>{ h += `<a class="chip found" target="_blank" href="${a.url}">${esc(a.shortname)}: ${esc(a.username||'')}</a>`; });
@@ -798,7 +702,7 @@ function renderTool(tool, data){
     } else if(hibp && !hibp.ok){
       h += `<div class="sec-label">HIBP</div><div class="empty">${esc(hibp.error)}</div>`;
     }
-    return h || `<div class="empty">tidak ada data</div>`;
+    return h || `<div class="empty">no data</div>`;
   }
   if(tool==='ip' && data.ip_geo){
     const g = data.ip_geo; let h = `<h3>IP Geolocation</h3><div class="grid">`;
@@ -820,27 +724,27 @@ function renderTool(tool, data){
     const g = data.github;
     if(!g.ok) return `<h3>GitHub</h3><pre>${esc(g.error)}</pre>`;
     const d = g.data; let h = `<h3>GitHub — ${esc(d.login)}</h3><div class="grid">`;
-    h += field('Nama', d.name); h += field('Lokasi', d.location); h += field('Company', d.company);
+    h += field('Name', d.name); h += field('Location', d.location); h += field('Company', d.company);
     h += field('Email', d.email); h += field('Blog', d.blog); h += field('Twitter', d.twitter);
-    h += field('Public Repos', d.public_repos); h += field('Followers', d.followers); h += field('Dibuat', d.created);
+    h += field('Public Repos', d.public_repos); h += field('Followers', d.followers); h += field('Created', d.created);
     h += `</div>`;
     if(d.commit_emails && d.commit_emails.length) h += `<h3>Commit Emails</h3><div class="links">` + d.commit_emails.map(e=>`<span class="chip">${esc(e)}</span>`).join('') + `</div>`;
-    if(d.repos && d.repos.length){ h += `<h3>Repo</h3>`; d.repos.slice(0,12).forEach(r=>{ h += `<div class="result-item"><div><div class="tt">${esc(r.name)} ${r.lang?('· '+esc(r.lang)):''} ★${r.stars||0}</div></div><a class="go" target="_blank" href="${r.url}">buka</a></div>`; }); }
+    if(d.repos && d.repos.length){ h += `<h3>Repos</h3>`; d.repos.slice(0,12).forEach(r=>{ h += `<div class="result-item"><div><div class="tt">${esc(r.name)} ${r.lang?('· '+esc(r.lang)):''} ★${r.stars||0}</div></div><a class="go" target="_blank" href="${r.url}">open</a></div>`; }); }
     return h;
   }
   if(tool==='email' && data.email){
     const e2 = data.email.data || data.email; let h = `<h3>Email Lookup</h3><div class="grid">`;
-    h += field('Domain', e2.domain); h += field('Disposable', e2.is_disposable?'ya':'tidak'); h += field('Free mail', e2.is_free?'ya':'tidak');
+    h += field('Domain', e2.domain); h += field('Disposable', e2.is_disposable?'yes':'no'); h += field('Free mail', e2.is_free?'yes':'no');
     h += `</div>`;
     if(e2.gravatar){
       h += `<h3>Gravatar</h3><div class="grid">` + field('Display name', e2.gravatar.display_name) + field('Name', e2.gravatar.name) + field('About', e2.gravatar.about) + `</div>`;
-      if(e2.gravatar.profile_url) h += `<div class="links"><a target="_blank" href="${e2.gravatar.profile_url}">Profil Gravatar</a></div>`;
+      if(e2.gravatar.profile_url) h += `<div class="links"><a target="_blank" href="${e2.gravatar.profile_url}">Gravatar Profile</a></div>`;
       if(e2.gravatar.accounts && e2.gravatar.accounts.length){
-        h += `<h3>Akun Terhubung</h3><div class="links">`;
+        h += `<h3>Linked Accounts</h3><div class="links">`;
         e2.gravatar.accounts.forEach(a=>{ h += `<a class="chip found" target="_blank" href="${a.url}">${esc(a.shortname)}: ${esc(a.username||'')}</a>`; });
         h += `</div>`;
       }
-    } else h += `<h3>Gravatar</h3><div class="empty">tidak ada</div>`;
+    } else h += `<h3>Gravatar</h3><div class="empty">none</div>`;
     return h;
   }
   if(tool==='whois' && data.whois){
@@ -866,7 +770,7 @@ function renderTool(tool, data){
     for(const [k,v] of Object.entries(d)){ if(k==='image_url')continue; h += `<a target="_blank" href="${v}">${esc(k)}</a>`; }
     return h + `</div>`;
   }
-  return `<h3>Hasil</h3><pre>${esc(JSON.stringify(data,null,2))}</pre>`;
+  return `<h3>Result</h3><pre>${esc(JSON.stringify(data,null,2))}</pre>`;
 }
 </script>
 </body>

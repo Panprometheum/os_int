@@ -1,6 +1,6 @@
 <?php
 // osint/grabber/api_tools.php
-// API bridge: panggil osint_phone.py untuk semua tool + resolve.
+// API bridge: calls osint_phone.py for every tool + resolve.
 
 header('Content-Type: application/json');
 
@@ -8,7 +8,7 @@ $cfg = require __DIR__ . '/config.php';
 
 $script = realpath(__DIR__ . '/../osint_phone.py');
 if ($script === false) {
-    echo json_encode(['ok' => false, 'error' => 'osint_phone.py tidak ditemukan']);
+    echo json_encode(['ok' => false, 'error' => 'osint_phone.py not found']);
     exit;
 }
 $python = 'python';
@@ -17,7 +17,7 @@ function run_py($python, $script, array $args) {
     $cmd = escapeshellarg($python) . ' ' . escapeshellarg($script);
     foreach ($args as $a) $cmd .= ' ' . escapeshellarg($a);
     $proc = @proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-    if (!is_resource($proc)) return [null, 'proc_open gagal'];
+    if (!is_resource($proc)) return [null, 'proc_open failed'];
     $out = stream_get_contents($pipes[1]);
     $err = stream_get_contents($pipes[2]);
     fclose($pipes[1]); fclose($pipes[2]);
@@ -47,13 +47,13 @@ $map = [
     'revimg'    => ['--reverse-image', $val, '--json'],
 ];
 
-// helper: tambah pasangan --flag value kalau key terisi
+// helper: append --flag value pair when the key is set
 function add_key(array &$args, array $cfg, string $flag, string $key) {
     if (!empty($cfg[$key])) { $args[] = $flag; $args[] = $cfg[$key]; }
 }
 
 if ($tool === 'lookup' || $tool === 'resolve') {
-    if (!preg_match('/\d{6,15}/', $val)) { echo json_encode(['ok'=>false,'error'=>'Nomor tidak valid']); exit; }
+    if (!preg_match('/\d{6,15}/', $val)) { echo json_encode(['ok'=>false,'error'=>'Invalid number']); exit; }
     if ($tool === 'lookup') {
         $map['lookup'] = [$val, '--json'];
     } else {
@@ -66,7 +66,7 @@ if ($tool === 'lookup' || $tool === 'resolve') {
     }
 }
 
-// key untuk tool spesifik
+// keys for specific tools
 if ($tool === 'ipintel') {
     $args = ['--ipintel', $val, '--json'];
     add_key($args, $cfg, '--shodan-key', 'shodan_key');
@@ -98,18 +98,18 @@ if ($tool === 'emailintel') {
 }
 
 if (!isset($map[$tool])) {
-    echo json_encode(['ok' => false, 'error' => 'tool tidak dikenal: ' . $tool]);
+    echo json_encode(['ok' => false, 'error' => 'unknown tool: ' . $tool]);
     exit;
 }
 
 [$out, $err] = run_py($python, $script, $map[$tool]);
 $out = trim($out ?? '');
-// sanitasi: buang byte UTF-8 invalid biar json_decode + json_encode gak gagal
+// sanitize: strip invalid UTF-8 bytes so json_decode + json_encode don't fail
 $out = mb_convert_encoding($out, 'UTF-8', 'UTF-8');
 $j = json_decode($out, true);
 if (is_array($j)) {
     echo json_encode(['ok' => true, 'tool' => $tool, 'data' => $j], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } else {
-    echo json_encode(['ok' => false, 'tool' => $tool, 'error' => 'parse gagal: ' . json_last_error_msg(),
+    echo json_encode(['ok' => false, 'tool' => $tool, 'error' => 'parse failed: ' . json_last_error_msg(),
                       'raw' => substr($out, 0, 500), 'stderr' => $err], JSON_INVALID_UTF8_SUBSTITUTE);
 }

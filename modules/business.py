@@ -1,13 +1,13 @@
 """business.py - business / company registry lookup.
 
-Source:
-  - OpenCorporates API (butuh token; sebagian endpoint publik terbatas)
-  - UK Companies House (butuh API key, gratis)
-  - SEC EDGAR (US public companies, GRATIS tanpa key)
-  - GLEIF LEI (global legal entity, GRATIS tanpa key)
-  - Indonesia: AHU Online (scrape terbatas) + OSS
+Sources:
+  - OpenCorporates API (needs token; some public endpoints are limited)
+  - UK Companies House (needs API key, free)
+  - SEC EDGAR (US public companies, FREE, no key)
+  - GLEIF LEI (global legal entity, FREE, no key)
+  - Indonesia: AHU Online (limited scrape) + OSS
 
-Semua balikin {ok, source, data, error}.
+All return {ok, source, data, error}.
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ def _get(url: str, headers: dict | None = None, params: dict | None = None, time
 
 
 # ---------------------------------------------------------------------------
-# SEC EDGAR — US public companies (GRATIS, no key)
+# SEC EDGAR — US public companies (FREE, no key)
 # ---------------------------------------------------------------------------
 def sec_edgar(company: str) -> dict:
     s, b = _get("https://www.sec.gov/cgi-bin/browse-edgar",
@@ -60,7 +60,7 @@ def sec_edgar(company: str) -> dict:
         return {"ok": False, "source": "sec-edgar", "error": b}
     # EDGAR full-text search API (lebih bersih)
     s2, b2 = _get(f"https://efts.sec.gov/LATEST/search-index?q=%22{urllib.parse.quote(company)}%22&forms=10-K")
-    # pakai EDGAR company search JSON
+    # use the EDGAR company search JSON
     s3, b3 = _get("https://www.sec.gov/cgi-bin/browse-edgar",
                   headers={"User-Agent": "osint-research contact@example.com"},
                   params={"company": company, "type": "10-K", "action": "getcompany", "output": "atom",
@@ -86,7 +86,7 @@ def sec_edgar_fulltext(q: str) -> dict:
             return {"ok": True, "source": "sec-edgar-fulltext", "data": json.loads(b)}
         except Exception:
             pass
-    # endpoint benar: /LATEST/search-index tidak valid; gunakan EFS UI API
+    # correct endpoint: /LATEST/search-index is invalid; use the EFS UI API
     s, b = _get("https://efts.sec.gov/LATEST/search-index?q=" + urllib.parse.quote(f'"{q}"'))
     s, b = _get("https://efts.sec.gov/LATEST/search-index?q=" + urllib.parse.quote(q), params={"forms": "10-K"})
     if s == 200:
@@ -98,7 +98,7 @@ def sec_edgar_fulltext(q: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# GLEIF LEI — global legal entity (GRATIS, no key)
+# GLEIF LEI — global legal entity (FREE, no key)
 # ---------------------------------------------------------------------------
 def gleif_lei(name: str) -> dict:
     s, b = _get("https://api.gleif.org/api/v1/lei-records",
@@ -135,7 +135,7 @@ def gleif_by_lei(lei: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# OpenCorporates (butuh token)
+# OpenCorporates (needs token)
 # ---------------------------------------------------------------------------
 def opencorporates(name: str, api_token: str = "") -> dict:
     url = "https://api.opencorporates.com/v0.4/companies/search"
@@ -145,7 +145,7 @@ def opencorporates(name: str, api_token: str = "") -> dict:
     s, b = _get(url, params=params)
     if s is None or s != 200:
         return {"ok": False, "source": "opencorporates",
-                "error": f"http {s} (butuh token — daftar di opencorporates.com)"}
+                "error": f"http {s} (needs token — register at opencorporates.com)"}
     try:
         j = json.loads(b)
         results = []
@@ -163,11 +163,11 @@ def opencorporates(name: str, api_token: str = "") -> dict:
 
 
 # ---------------------------------------------------------------------------
-# UK Companies House (butuh API key, gratis)
+# UK Companies House (needs API key, free)
 # ---------------------------------------------------------------------------
 def uk_companies_house(name: str, api_key: str = "") -> dict:
     if not api_key:
-        return {"ok": False, "source": "companies-house", "error": "butuh API key (gratis di company-information.service.gov.uk)"}
+        return {"ok": False, "source": "companies-house", "error": "needs API key (free at company-information.service.gov.uk)"}
     import base64
     token = base64.b64encode(f"{api_key}:".encode()).decode()
     s, b = _get("https://api.company-information.service.gov.uk/search/companies",
@@ -190,10 +190,10 @@ def uk_companies_house(name: str, api_key: str = "") -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Indonesia — AHU Online (scrape terbatas; butuh captcha/session biasanya)
+# Indonesia — AHU Online (limited scrape; usually needs captcha/session)
 # ---------------------------------------------------------------------------
 def ahu_indonesia(name: str) -> dict:
-    """AHU Online punya proteksi; kita kasih endpoint + link + fallback."""
+    """AHU Online has protection; we provide the endpoint + link + fallback."""
     # endpoint publik yg kadang works
     s, b = _get("https://ahu.go.id/pencarian/profil-badan-hukum",
                 params={"nama": name})
@@ -201,7 +201,7 @@ def ahu_indonesia(name: str) -> dict:
     return {"ok": True, "source": "ahu-indonesia", "data": {
         "name": name,
         "reachable": reachable,
-        "note": "AHU Online sering butuh captcha/session. Buka manual:",
+                "note": "AHU Online often needs captcha/session. Open manually:",
         "links": {
             "ahu_profil": "https://ahu.go.id/pencarian/profil-badan-hukum",
             "ahu_persero": "https://ahu.go.id/pencarian/profil-perseroan",

@@ -1,21 +1,21 @@
-# Analisis Temuan — Nomor 08xxxxxxxxxx
+# Findings Analysis — Number 08xxxxxxxxxx
 
-Salin template ini per target. Isi yang ketemu, tandai yang belum.
+Copy this template per target. Fill in what you find, mark what you haven't.
 
 ---
 
 ## Target
-- **Nomor**: 08xxxxxxxxxx
+- **Number**: 08xxxxxxxxxx
 - **E.164**: +62xxxxxxxxxx
 - **Operator**:
-- **Tanggal mulai**:
+- **Start date**:
 
 ---
 
-## A. Nama & Identitas
+## A. Name & Identity
 
-| Sumber | Nama terlihat | Avatar | Catatan |
-|--------|---------------|--------|---------|
+| Source | Name seen | Avatar | Notes |
+|--------|-----------|--------|-------|
 | WhatsApp | | | |
 | Telegram | | | |
 | Truecaller | | | |
@@ -23,28 +23,28 @@ Salin template ini per target. Isi yang ketemu, tandai yang belum.
 | Sync.me | | | |
 | Facebook search | | | |
 
-**Nama asumsi:**
+**Assumed name:**
 
 ---
 
 ## B. Email & Breach
 
-| Sumber | Email | Password | Catatan |
-|--------|-------|----------|---------|
+| Source | Email | Password | Notes |
+|--------|-------|----------|-------|
 | HIBP | | | |
 | Password reset hint | | | |
 | Dehashed | | | |
 | IntelX | | | |
 | Google dork | | | |
 
-**Email utama:**
+**Primary email:**
 
 ---
 
-## C. Akun Terkait (username reuse)
+## C. Related Accounts (username reuse)
 
-| Platform | Username | URL | Catatan |
-|----------|----------|-----|---------|
+| Platform | Username | URL | Notes |
+|----------|----------|-----|-------|
 | Instagram | | | |
 | Facebook | | | |
 | GitHub | | | |
@@ -54,53 +54,48 @@ Salin template ini per target. Isi yang ketemu, tandai yang belum.
 
 ---
 
-## D. Lokasi
+## D. Location
 
-### Dari metadata
-- Foto sumber:
+### From metadata
+- Source photo:
 - EXIF GPS:
-- Geotag post:
+- Post geotag:
 - Check-in:
 
-### Dari IP grabber
+### From public IP intelligence (your own / authorized infrastructure only)
 - IP:
-- Kota/ISP:
-- Lat/Lon:
+- City/ISP:
+- Lat/Lon (city-level):
 - Accuracy:
-
-### Dari geolocation prompt
-- Lat/Lon presisi:
-- Accuracy:
-- Waktu korban Allow:
 
 ---
 
 ## E. Operator & Region
 
-- Operator aktif:
-- MNP (pindah operator?):
-- Region registrasi:
+- Active operator:
+- MNP (ported operator?):
+- Registration region:
 
 ---
 
-## F. Timeline Aktivitas
+## F. Activity Timeline
 
-| Waktu | Platform | Aktivitas |
-|-------|----------|-----------|
+| Time | Platform | Activity |
+|------|----------|----------|
 | | | |
 
 ---
 
-## G. Kesimpulan
+## G. Conclusion
 
-- **Identitas**: 
-- **Lokasi terakhir**: 
-- **Akun terkait**: 
-- **Confidence**: rendah / sedang / tinggi
+- **Identity**: 
+- **Last location**: 
+- **Related accounts**: 
+- **Confidence**: low / medium / high
 
 ---
 
-## H. Loose Ends (belum ketemu)
+## H. Loose Ends (not yet found)
 
 - [ ] 
 - [ ] 

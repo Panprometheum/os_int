@@ -30,16 +30,14 @@ harden it first:
    Only enable that behind auth.
 3. **API keys live in `grabber/config_keys.json`** (mode 0600, gitignored). Never commit
    this file. Rotate any key that was ever pasted into a log, screenshot, or chat.
-4. **Grabber logs (`grabber/logs/hits.jsonl`) contain visitor IPs and locations.**
-   Treat them as sensitive personal data: restrict access, encrypt backups, delete
-   when no longer needed.
-5. **Shell execution.** `api_tools.php` shells out to `osint_phone.py` via `proc_open`.
+4. **Shell execution.** `api_tools.php` shells out to `osint_phone.py` via `proc_open`.
    Arguments are allow-listed and escaped (`escapeshellarg`), but do not add new
    tool endpoints without keeping that allow-list.
 
 ## Responsible Use
 
-This toolkit can resolve phone numbers to social accounts and log visitor locations.
+This toolkit resolves phone numbers to publicly visible accounts and queries public /
+official-API sources. It does not capture visitor IPs or device locations.
 Use it only on assets you own, with explicit consent, or under lawful authorization
 (e.g. asset recovery, defensive research, formal investigations). The maintainers
 are not responsible for misuse.

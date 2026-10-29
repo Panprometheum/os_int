@@ -1,6 +1,6 @@
-"""enrich.py - enrichment modul: phonenumbers, breach, email, sosmed, github, gravatar.
+"""enrich.py - enrichment module: phonenumbers, breach, email, social, github, gravatar.
 
-Semua fungsi balikin dict konsisten {ok, data, source, error}.
+All functions return a consistent dict {ok, data, source, error}.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def enrich_phone(raw: str) -> dict:
         import phonenumbers
         from phonenumbers import carrier, geocoder, timezone, number_type, PhoneNumberType
     except ImportError:
-        return {"ok": False, "source": "phonenumbers", "error": "lib tidak terpasang"}
+        return {"ok": False, "source": "phonenumbers", "error": "lib not installed"}
 
     # deteksi region default Indonesia
     try:
@@ -52,7 +52,7 @@ def enrich_phone(raw: str) -> dict:
         return {"ok": False, "source": "phonenumbers", "error": str(e)}
 
     if not phonenumbers.is_valid_number(pn):
-        return {"ok": False, "source": "phonenumbers", "error": "nomor tidak valid"}
+        return {"ok": False, "source": "phonenumbers", "error": "invalid number"}
 
     types = {
         PhoneNumberType.MOBILE: "mobile",
@@ -94,21 +94,21 @@ def enrich_phone(raw: str) -> dict:
 # --------------------------------------------------------------------------
 def breach_hibp(account: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "hibp", "error": "butuh API key"}
+        return {"ok": False, "source": "hibp", "error": "needs API key"}
     url = f"https://haveibeenpwned.com/api/v3/breachedaccount/{urllib.parse.quote(account)}?truncateResponse=false"
     raw = _http(url, headers={"hibp-api-key": api_key})
     if raw is None:
-        return {"ok": True, "source": "hibp", "data": {"breaches": [], "note": "clean atau tidak terdeteksi"}}
+        return {"ok": True, "source": "hibp", "data": {"breaches": [], "note": "clean or not detected"}}
     try:
         j = json.loads(raw)
         return {"ok": True, "source": "hibp", "data": {"breaches": j}}
     except Exception:
-        return {"ok": False, "source": "hibp", "error": "parse gagal"}
+        return {"ok": False, "source": "hibp", "error": "parse failed"}
 
 
 def breach_pastes(account: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "hibp-paste", "error": "butuh API key"}
+        return {"ok": False, "source": "hibp-paste", "error": "needs API key"}
     url = f"https://haveibeenpwned.com/api/v3/pasteaccount/{urllib.parse.quote(account)}"
     raw = _http(url, headers={"hibp-api-key": api_key})
     if raw is None:
@@ -116,11 +116,11 @@ def breach_pastes(account: str, api_key: str) -> dict:
     try:
         return {"ok": True, "source": "hibp-paste", "data": {"pastes": json.loads(raw)}}
     except Exception:
-        return {"ok": False, "source": "hibp-paste", "error": "parse gagal"}
+        return {"ok": False, "source": "hibp-paste", "error": "parse failed"}
 
 
 # --------------------------------------------------------------------------
-# 3. Email -> akun (epieos-style, gravatar) + domain info
+# 3. Email -> account (epieos-style, gravatar) + domain info
 # --------------------------------------------------------------------------
 def email_lookup(email: str) -> dict:
     out = {"ok": True, "source": "email", "data": {}}
@@ -170,8 +170,8 @@ FREE_DOMAINS = {
 def github_lookup(username: str) -> dict:
     j = _http_json(f"https://api.github.com/users/{urllib.parse.quote(username)}")
     if not j or j.get("message") == "Not Found":
-        return {"ok": False, "source": "github", "error": "tidak ditemukan"}
-    # ambil repo publik
+        return {"ok": False, "source": "github", "error": "not found"}
+    # fetch public repos
     repos = _http_json(f"https://api.github.com/users/{urllib.parse.quote(username)}/repos?per_page=100&sort=updated") or []
     rels = []
     for r in repos[:30]:
@@ -229,7 +229,7 @@ def username_check(username: str) -> dict:
 
 
 def _probe(url: str, pos_markers: list[str], neg_markers: list[str]) -> dict:
-    """GET halaman, cek marker positif/negatif."""
+    """GET a page, check for positive/negative markers."""
     h = {"User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"}
     req = urllib.request.Request(url, headers=h, method="GET")
     try:
@@ -244,7 +244,7 @@ def _probe(url: str, pos_markers: list[str], neg_markers: list[str]) -> dict:
         hits = sum(1 for m in pos_markers if m.lower() in low)
         if hits > 0:
             return {"status": "found", "markers": hits}
-        # tidak ada marker negatif -> kemungkinan ada (redirect ke profil generik)
+        # no negative markers -> likely exists (redirect to a generic profile)
         return {"status": "maybe"}
     except urllib.error.HTTPError as e:
         return {"status": "not found" if e.code == 404 else f"http {e.code}"}

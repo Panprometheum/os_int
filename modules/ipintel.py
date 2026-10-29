@@ -1,17 +1,17 @@
-"""ipintel.py - IP intelligence (gratis + opsional key).
+"""ipintel.py - IP intelligence (free + optional key).
 
-Source gratis:
+Free sources:
   - Shodan InternetDB  (ports, hostnames, cpes, vulns)
   - IPinfo             (hostname, geo, org, ASN)
   - GreyNoise community (noise/riot scanning)
   - ip-api / ipwho.is  (geo fallback)
 
-Source butuh key (opsional):
+Sources needing a key (optional):
   - Shodan full  (services, banners, vulns detail)
   - Censys       (hosts, services)
   - AbuseIPDB    (reputation, reports)
 
-Semua balikin {ok, source, data, error}.
+All return {ok, source, data, error}.
 """
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def _get(url: str, headers: dict | None = None, params: dict | None = None, time
 
 # ---------------------------------------------------------------------------
 def shodan_internetdb(ip: str) -> dict:
-    """Gratis, tanpa key. Ports, hostnames, cpes, tags, vulns."""
+    """Free, no key. Ports, hostnames, cpes, tags, vulns."""
     s, b = _get(f"https://internetdb.shodan.io/{urllib.parse.quote(ip)}")
     if s == 404:
         return {"ok": True, "source": "shodan-internetdb", "data": {"ip": ip, "found": False}}
@@ -73,7 +73,7 @@ def shodan_internetdb(ip: str) -> dict:
 
 def shodan_host(ip: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "shodan", "error": "butuh API key"}
+        return {"ok": False, "source": "shodan", "error": "needs API key"}
     s, b = _get(f"https://api.shodan.io/shodan/host/{urllib.parse.quote(ip)}?key={api_key}")
     if s is None or s != 200:
         return {"ok": False, "source": "shodan", "error": f"http {s}"}
@@ -118,7 +118,7 @@ def greynoise(ip: str) -> dict:
 
 def abuseipdb(ip: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "abuseipdb", "error": "butuh API key"}
+        return {"ok": False, "source": "abuseipdb", "error": "needs API key"}
     s, b = _get("https://api.abuseipdb.com/api/v2/check",
                 headers={"Key": api_key, "Accept": "application/json"},
                 params={"ipAddress": ip, "maxAgeInDays": 90})
@@ -132,11 +132,11 @@ def abuseipdb(ip: str, api_key: str) -> dict:
 
 def censys(ip: str, api_id: str, api_secret: str) -> dict:
     if not (api_id and api_secret):
-        return {"ok": False, "source": "censys", "error": "butuh api_id + api_secret (Censys Platform v2+)"}
+        return {"ok": False, "source": "censys", "error": "needs api_id + api_secret (Censys Platform v2+)"}
     s, b = _get(f"https://search.censys.io/api/v2/hosts/{urllib.parse.quote(ip)}",
                 headers={"Accept": "application/json"},
                 timeout=TIMEOUT)
-    # Censys butuh basic auth; requests handle via auth param, fallback di sini
+    # Censys needs basic auth; requests handles it via the auth param, fallback here
     if _req is not None:
         try:
             r = _req.get(f"https://search.censys.io/api/v2/hosts/{urllib.parse.quote(ip)}",
@@ -146,7 +146,7 @@ def censys(ip: str, api_id: str, api_secret: str) -> dict:
             return {"ok": False, "source": "censys", "error": f"http {r.status_code}: {r.text[:120]}"}
         except Exception as e:
             return {"ok": False, "source": "censys", "error": str(e)}
-    return {"ok": False, "source": "censys", "error": "butuh requests"}
+        return {"ok": False, "source": "censys", "error": "needs requests"}
 
 
 # ---------------------------------------------------------------------------

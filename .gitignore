@@ -1,6 +1,5 @@
-# Secrets & runtime data — jangan commit
+# Secrets & runtime data — do not commit
 grabber/config_keys.json
-grabber/logs/
 modules/__pycache__/
 __pycache__/
 *.pyc

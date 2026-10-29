@@ -1,16 +1,16 @@
-"""breach.py - sumber breach / kebocoran data & email intelligence.
+"""breach.py - breach / data leak & email intelligence sources.
 
-Source:
-  - Hudson Rock (info-stealer, gratis)
-  - HIBP (butuh key)
-  - HIBP paste (butuh key)
-  - PGP keyserver (email -> key, nama)
-  - Gravatar (email -> profil)
-  - EmailRep (butuh key, fallback)
+Sources:
+  - Hudson Rock (info-stealer, free)
+  - HIBP (needs key)
+  - HIBP paste (needs key)
+  - PGP keyserver (email -> key, name)
+  - Gravatar (email -> profile)
+  - EmailRep (needs key, fallback)
   - Pastebin search (via Google/Jina)
   - deep email checks
 
-Semua balikin {ok, source, data, error}.
+All return {ok, source, data, error}.
 """
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def _get(url: str, headers: dict | None = None, timeout: int = TIMEOUT):
 
 
 # ---------------------------------------------------------------------------
-# Hudson Rock — info-stealer infection check (GRATIS)
+# Hudson Rock — info-stealer infection check (FREE)
 # ---------------------------------------------------------------------------
 def hudson_rock_email(email: str) -> dict:
     url = "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email?email=" + urllib.parse.quote(email)
@@ -104,7 +104,7 @@ def hudson_rock_domain(domain: str) -> dict:
 # ---------------------------------------------------------------------------
 def hibp_breaches(account: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "hibp", "error": "butuh API key"}
+        return {"ok": False, "source": "hibp", "error": "needs API key"}
     s, b = _get(f"https://haveibeenpwned.com/api/v3/breachedaccount/{urllib.parse.quote(account)}?truncateResponse=false",
                 headers={"hibp-api-key": api_key})
     if s == 404:
@@ -119,7 +119,7 @@ def hibp_breaches(account: str, api_key: str) -> dict:
 
 def hibp_pastes(account: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "hibp-paste", "error": "butuh API key"}
+        return {"ok": False, "source": "hibp-paste", "error": "needs API key"}
     s, b = _get(f"https://haveibeenpwned.com/api/v3/pasteaccount/{urllib.parse.quote(account)}",
                 headers={"hibp-api-key": api_key})
     if s == 404:
@@ -157,9 +157,8 @@ def _pgp_uid(pem: str) -> str | None:
 
 
 def _pgp_fpr(pem: str) -> str | None:
-    import re
-    m = re.search(r"-----BEGIN PGP PUBLIC KEY BLOCK-----", pem)
-    return None  # fingerprint butuh parsing binary; skip
+    # Full fingerprint requires binary parsing of the key packet; not implemented.
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -185,11 +184,11 @@ def gravatar(email: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# EmailRep (butuh key)
+# EmailRep (needs key)
 # ---------------------------------------------------------------------------
 def emailrep(email: str, api_key: str = "") -> dict:
     if not api_key:
-        return {"ok": False, "source": "emailrep", "error": "butuh API key (emailrep.io)"}
+        return {"ok": False, "source": "emailrep", "error": "needs API key (emailrep.io)"}
     s, b = _get("https://emailrep.io/" + urllib.parse.quote(email),
                 headers={"Key": api_key})
     if s is None or s != 200:
@@ -201,7 +200,7 @@ def emailrep(email: str, api_key: str = "") -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Gravatar + PGP + Hudson Rock gabungan untuk 1 email
+# Gravatar + PGP + Hudson Rock combined for a single email
 # ---------------------------------------------------------------------------
 def email_intel(email: str, hibp_key: str = "", emailrep_key: str = "") -> dict:
     jobs = {

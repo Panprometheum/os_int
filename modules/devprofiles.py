@@ -1,9 +1,9 @@
-"""devprofiles.py - lookup profil developer & komunitas (API publik, tanpa key).
+"""devprofiles.py - developer & community profile lookup (public APIs, no key).
 
-Source: GitHub, GitLab, PyPI, npm, DockerHub, StackOverflow, Keybase,
-        HackerNews, Mastodon, Reddit, DevTo, Codeberg, Gitea.
+Sources: GitHub, GitLab, PyPI, npm, DockerHub, StackOverflow, Keybase,
+         HackerNews, Mastodon, Reddit, DevTo, Codeberg, Gitea.
 
-Semua balikin {ok, source, data, error} atau dict per-platform.
+All return {ok, source, data, error} or a per-platform dict.
 """
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def github(username: str) -> dict:
 
 
 def gitlab(username: str) -> dict:
-    # GitLab public API sering 403 utk search; coba profile langsung
+    # GitLab public API often 403s on search; try the profile endpoint directly
     j, err = _json(f"https://gitlab.com/api/v4/users?username={urllib.parse.quote(username)}")
     if err or not j:
         return {"platform": "gitlab", "found": False, "error": err or "empty"}
@@ -84,7 +84,7 @@ def gitlab(username: str) -> dict:
 def pypi(username: str) -> dict:
     # PyPI: profile page (HTML) + packages by user
     j, err = _json(f"https://pypi.org/user/{urllib.parse.quote(username)}/")
-    # PyPI user page bukan JSON; cek via packages
+    # PyPI user page is not JSON; check via packages
     pkgs, _ = _json(f"https://pypi.org/pypi/{urllib.parse.quote(username)}/json")
     if pkgs:
         info = pkgs.get("info", {})
@@ -99,7 +99,7 @@ def pypi(username: str) -> dict:
 def npm(username: str) -> dict:
     j, err = _json(f"https://registry.npmjs.org/-/user/org.couchdb.user:{urllib.parse.quote(username)}")
     if err or not j or not j.get("name"):
-        # coba search package
+        # try package search
         s, _ = _json(f"https://registry.npmjs.org/-/v1/search?text=maintainer:{urllib.parse.quote(username)}&size=10")
         if s and s.get("objects"):
             return {"platform": "npm", "found": True, "data": {
@@ -214,7 +214,7 @@ def codeberg(username: str) -> dict:
 
 # ---------------------------------------------------------------------------
 def lookup_all(username: str, reddit_ua_ok: bool = True) -> dict:
-    """Jalankan semua source paralel."""
+    """Run all sources in parallel."""
     jobs = {
         "github": github, "gitlab": gitlab, "pypi": pypi, "npm": npm,
         "dockerhub": dockerhub, "stackoverflow": stackoverflow, "keybase": keybase,

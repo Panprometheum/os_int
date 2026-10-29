@@ -1,18 +1,18 @@
 """leakcheck.py - breach / credential leak sources.
 
-Gratis (public) :
+Free (public):
   - LeakCheck public (found count, fields, sources)
-  - HIBP breaches list (daftar semua breach publik)
-  - HIBP account (butuh key)
-  - HIBP paste  (butuh key)
+  - HIBP breaches list (all public breaches)
+  - HIBP account (needs key)
+  - HIBP paste  (needs key)
 
-Butuh key (opsional):
-  - LeakCheck API (v2, full hasil)
+Needs key (optional):
+  - LeakCheck API (v2, full results)
   - Snusbase
   - DeHashed
   - BreachDirectory (RapidAPI)
 
-Semua balikin {ok, source, data, error}.
+All return {ok, source, data, error}.
 """
 from __future__ import annotations
 
@@ -56,17 +56,17 @@ def _get(url: str, headers: dict | None = None, params: dict | None = None, time
 # LeakCheck
 # ---------------------------------------------------------------------------
 def leakcheck_public(term: str) -> dict:
-    """Gratis, tanpa key. Balikin count + fields + source names."""
+    """Free, no key. Returns count + fields + source names."""
     s, b = _get("https://leakcheck.io/api/public", params={"check": term})
     if s is None:
         return {"ok": False, "source": "leakcheck-public", "error": b}
     if s == 429:
-        return {"ok": False, "source": "leakcheck-public", "error": "rate limited (coba lagi)"}
+        return {"ok": False, "source": "leakcheck-public", "error": "rate limited (try again)"}
     try:
         j = json.loads(b)
         if not j.get("success"):
             return {"ok": True, "source": "leakcheck-public", "data": {
-                "term": term, "found": 0, "message": j.get("error") or "tidak ditemukan"}}
+                "term": term, "found": 0, "message": j.get("error") or "not found"}}
         return {"ok": True, "source": "leakcheck-public", "data": {
             "term": term, "found": j.get("found"),
             "fields": j.get("fields", []),
@@ -77,9 +77,9 @@ def leakcheck_public(term: str) -> dict:
 
 
 def leakcheck_api(term: str, api_key: str) -> dict:
-    """Full hasil via API v2 (butuh key)."""
+    """Full results via API v2 (needs key)."""
     if not api_key:
-        return {"ok": False, "source": "leakcheck-api", "error": "butuh API key"}
+        return {"ok": False, "source": "leakcheck-api", "error": "needs API key"}
     s, b = _get(f"https://leakcheck.io/api/v2/query/{urllib.parse.quote(term)}",
                 headers={"X-API-Key": api_key, "accept": "application/json"})
     if s is None or s != 200:
@@ -94,7 +94,7 @@ def leakcheck_api(term: str, api_key: str) -> dict:
 # HIBP
 # ---------------------------------------------------------------------------
 def hibp_all_breaches() -> dict:
-    """Daftar semua breach publik (tanpa key) — buat referensi."""
+    """List all public breaches (no key) — for reference."""
     s, b = _get("https://haveibeenpwned.com/api/v3/breaches", headers={"User-Agent": "osint"})
     if s is None or s != 200:
         return {"ok": False, "source": "hibp-list", "error": f"http {s}"}
@@ -112,7 +112,7 @@ def hibp_all_breaches() -> dict:
 
 def hibp_account(account: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "hibp", "error": "butuh API key"}
+        return {"ok": False, "source": "hibp", "error": "needs API key"}
     s, b = _get(f"https://haveibeenpwned.com/api/v3/breachedaccount/{urllib.parse.quote(account)}?truncateResponse=false",
                 headers={"hibp-api-key": api_key})
     if s == 404:
@@ -127,7 +127,7 @@ def hibp_account(account: str, api_key: str) -> dict:
 
 def hibp_paste(account: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "hibp-paste", "error": "butuh API key"}
+        return {"ok": False, "source": "hibp-paste", "error": "needs API key"}
     s, b = _get(f"https://haveibeenpwned.com/api/v3/pasteaccount/{urllib.parse.quote(account)}",
                 headers={"hibp-api-key": api_key})
     if s == 404:
@@ -141,11 +141,11 @@ def hibp_paste(account: str, api_key: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Snusbase / DeHashed / BreachDirectory (butuh key)
+    # Snusbase / DeHashed / BreachDirectory (need key)
 # ---------------------------------------------------------------------------
 def snusbase(term: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "snusbase", "error": "butuh API key"}
+        return {"ok": False, "source": "snusbase", "error": "needs API key"}
     try:
         r = _req.post("https://api.snusbase.com/data/search",
                       headers={"Auth": api_key, "Content-Type": "application/json"},
@@ -160,7 +160,7 @@ def snusbase(term: str, api_key: str) -> dict:
 
 def dehashed(query: str, api_key: str) -> dict:
     if not api_key:
-        return {"ok": False, "source": "dehashed", "error": "butuh API key (email:api_key)"}
+        return {"ok": False, "source": "dehashed", "error": "needs API key (email:api_key)"}
     import base64
     user, _, key = api_key.partition(":")
     token = base64.b64encode(f"{user}:{key}".encode()).decode()
@@ -176,7 +176,7 @@ def dehashed(query: str, api_key: str) -> dict:
 
 def breachdirectory(term: str, rapidapi_key: str) -> dict:
     if not rapidapi_key:
-        return {"ok": False, "source": "breachdirectory", "error": "butuh RapidAPI key"}
+        return {"ok": False, "source": "breachdirectory", "error": "needs RapidAPI key"}
     s, b = _get("https://breachdirectory.p.rapidapi.com/",
                 headers={"X-RapidAPI-Key": rapidapi_key, "X-RapidAPI-Host": "breachdirectory.p.rapidapi.com"},
                 params={"func": "auto", "term": term})

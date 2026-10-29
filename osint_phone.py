@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-osint_phone.py - Phone OSINT toolkit (versi presisi & lengkap).
+osint_phone.py - Phone OSINT toolkit (precise & complete edition).
 
-Modul:
-  - geo_engine : IP / WiFi / cell tower -> koordinat presisi
+Modules:
+  - geo_engine : IP / WiFi / cell tower -> approximate coordinates
   - enrich     : phonenumbers, breach, email, github, username, reverse-image
   - forensics  : EXIF, whois, DNS, subdomain, email harvester
 
@@ -24,7 +24,7 @@ import sys
 import urllib.parse
 from datetime import datetime
 
-# modul lokal
+# local modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "modules"))
 
 try:
@@ -37,14 +37,16 @@ try:
     import ipintel
     import leakcheck
     import business
+    # helper alias for candidate generation
+    generate_candidates = socint.generate_candidates
 except ImportError as e:
-    print(f"[!] Modul lokal gagal dimuat: {e}", file=sys.stderr)
-    print(f"    Pastikan folder 'modules/' ada di {os.path.dirname(__file__)}", file=sys.stderr)
+    print(f"[!] Failed to load local modules: {e}", file=sys.stderr)
+    print(f"    Make sure the 'modules/' folder exists in {os.path.dirname(__file__)}", file=sys.stderr)
     sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
-# Prefix operator Indonesia (data statis; blok bisa bergeser)
+# Indonesian operator prefixes (static data; blocks may shift over time)
 # ---------------------------------------------------------------------------
 ID_PREFIXES = {
     "0811": "Telkomsel (Halo)", "0812": "Telkomsel", "0813": "Telkomsel",
@@ -71,7 +73,7 @@ ID_REGIONS = {
 
 
 # ---------------------------------------------------------------------------
-# Normalisasi nomor (fallback kalau phonenumbers tidak ada)
+# Number normalization (fallback when phonenumbers lib is missing)
 # ---------------------------------------------------------------------------
 def normalize(raw: str) -> dict:
     import re
@@ -98,7 +100,7 @@ def normalize(raw: str) -> dict:
 
 
 def operator_lookup(local: str) -> str:
-    return ID_PREFIXES.get(local[:4], "Tidak diketahui / prefix tak terdaftar")
+    return ID_PREFIXES.get(local[:4], "Unknown / unlisted prefix")
 
 
 def region_lookup(local: str) -> str:
@@ -113,15 +115,21 @@ def google_dorks(n: dict) -> list[str]:
     return [
         f'"{intl}"', f'"+{intl}"', f'"{local}"', f'"{pretty}"',
         f'{intl} filetype:pdf',
-        f'{intl} site:facebook.com OR site:instagram.com OR site:twitter.com',
-        f'{intl} site:olx.co.id OR site:tokopedia.com OR site:shopee.co.id OR site:lazada.co.id',
-        f'{intl} site:pastebin.com OR site:github.com OR site:gitlab.com',
+        # social platforms
+        f'{intl} site:facebook.com OR site:instagram.com OR site:twitter.com OR site:tiktok.com',
+        f'{intl} site:reddit.com OR site:github.com OR site:linkedin.com',
+        # Indonesian marketplaces
+        f'{intl} site:olx.co.id OR site:tokopedia.com OR site:bukalapak.com OR site:shopee.co.id OR site:blibli.com',
+        f'{intl} site:pastebin.com OR site:gitlab.com OR site:instagram.com/explore',
+        # contact/account hints
         f'"{intl}" (wa OR whatsapp OR telegram OR line)',
         f'"{intl}" (nama OR alamat OR email OR rekening)',
         f'"{intl}" (gmail.com OR yahoo.com OR outlook.com)',
         f'"{intl}" (ktp OR npwp OR sim OR ijazah)',
         f'"{intl}" (jual OR beli OR dp OR cod)',
         f'"{local}" (penipu OR scam OR lapor)',
+        # directory / call-logger sites
+        f'{intl} site:namaseorang.com OR site:whoscall.com OR site:getcontact.com',
     ]
 
 
@@ -129,11 +137,11 @@ def google_dorks(n: dict) -> list[str]:
 # Confidence scoring
 # ---------------------------------------------------------------------------
 def confidence_score(profile: dict) -> dict:
-    """Hitung seberapa terverifikasi identitas target."""
+    """How verified the target identity is."""
     score = 0
     signals = []
     if profile.get("operator") and profile["operator"] != "—":
-        score += 5; signals.append("operator terdeteksi")
+        score += 5; signals.append("operator detected")
     if profile.get("phonenumbers"):
         p = profile["phonenumbers"]
         if p.get("carrier"):
@@ -141,28 +149,54 @@ def confidence_score(profile: dict) -> dict:
         if p.get("region"):
             score += 10; signals.append(f"region: {p['region']}")
         if p.get("number_type"):
-            score += 5; signals.append(f"tipe: {p['number_type']}")
+            score += 5; signals.append(f"type: {p['number_type']}")
     if profile.get("geo"):
         g = profile["geo"]
         acc = g.get("accuracy")
         if acc is not None:
             if acc <= 50:
-                score += 40; signals.append(f"GPS presisi ({acc}m)")
+                score += 40; signals.append(f"high-accuracy location ({acc}m)")
             elif acc <= 500:
-                score += 25; signals.append(f"lokasi sedang ({acc}m)")
+                score += 25; signals.append(f"medium location ({acc}m)")
             else:
-                score += 10; signals.append(f"lokasi kasar ({acc}m)")
+                score += 10; signals.append(f"coarse location ({acc}m)")
         else:
-            score += 8; signals.append("lokasi level IP")
+            score += 8; signals.append("IP-level location")
     if profile.get("breach", {}).get("count"):
         score += 15; signals.append(f"{profile['breach']['count']} breach")
     if profile.get("github"):
-        score += 12; signals.append("github terhubung")
+        score += 12; signals.append("github linked")
     if profile.get("email"):
-        score += 9; signals.append("email terhubung")
-
+        score += 9; signals.append("email linked")
+    # bonus for resolved social accounts across candidates
+    resolved = profile.get("resolved") or {}
+    for key, val in resolved.items():
+        if not isinstance(val, dict):
+            continue
+        data = val.get("data") or {}
+        # handle_pivot hits
+        if key == "handle_pivot" and isinstance(data, dict):
+            hits = data.get("hits") or {}
+            for pl, items in hits.items():
+                if items:
+                    score += 6; signals.append(f"pivot → {pl}")
+                    break  # one hit per platform family is enough
+        # social_* resolved profiles
+        if key.startswith("social_"):
+            uname = key[len("social_"):]
+            summary = data.get("_summary") or {}
+            if summary.get("found"):
+                score += 10; signals.append(f"social found: {uname}")
+            elif summary.get("probable"):
+                score += 5; signals.append(f"social probable: {uname}")
+        # telegram resolve
+        if key == "telegram" and isinstance(data, dict):
+            bn = data.get("by_number") or {}
+            bd = bn.get("data") or {}
+            if bd.get("display_name") and not bd.get("generic"):
+                score += 12; signals.append("telegram matched")
     score = min(score, 100)
-    level = "tinggi" if score >= 65 else ("sedang" if score >= 35 else "rendah")
+    level = "high" if score >= 65 else ("medium" if score >= 35 else "low")
     return {"score": score, "level": level, "signals": signals}
 
 
@@ -178,10 +212,10 @@ def build_report(n: dict, profile: dict, opts) -> str:
     L.append("=" * W)
     L.append("")
 
-    L.append("[1] NORMALISASI")
+    L.append("[1] NORMALIZATION")
     L.append(f"  Input    : {n['raw']}")
     L.append(f"  E.164    : {n['e164']}")
-    L.append(f"  Lokal    : {n['local']}  ({n['pretty']})")
+    L.append(f"  Local    : {n['local']}  ({n['pretty']})")
     L.append("")
 
     L.append("[2] OPERATOR & REGION")
@@ -190,23 +224,23 @@ def build_report(n: dict, profile: dict, opts) -> str:
     pn = profile.get("phonenumbers")
     if pn:
         L.append(f"  Carrier  : {pn.get('carrier') or '—'}")
-        L.append(f"  Tipe     : {pn.get('number_type') or '—'}")
+        L.append(f"  Type     : {pn.get('number_type') or '—'}")
         L.append(f"  Geo desc : {pn.get('geo_description') or '—'}")
         L.append(f"  Timezone : {', '.join(pn.get('timezones') or []) or '—'}")
-    L.append("  *region = area registrasi historis, BUKAN lokasi terkini")
+    L.append("  *region = historic registration area, NOT current location")
     L.append("")
 
-    L.append("[3] GEOLOKASI")
+    L.append("[3] GEOLOCATION")
     geo = profile.get("geo")
     if geo:
         L.append(f"  Source   : {geo.get('source')} ({geo.get('method', '')})")
         L.append(f"  Lat, Lon : {geo.get('lat')}, {geo.get('lon')}")
-        L.append(f"  Accuracy : {geo.get('accuracy') or '~kota'} m")
+        L.append(f"  Accuracy : {geo.get('accuracy') or '~city'} m")
     else:
-        L.append("  (tidak ada data geo — perlu IP/WiFi/cell)")
+        L.append("  (no geo data — needs IP/WiFi/cell)")
     L.append("")
 
-    L.append("[4] LINK PROBE (buka manual, cek nama/avatar/bio)")
+    L.append("[4] LINK PROBE (open manually, check name/avatar/bio)")
     L.append(f"  WhatsApp  : {n['wa']}")
     L.append(f"  Telegram  : {n['tg']}")
     L.append(f"  Truecaller: {n['truecaller']}")
@@ -223,8 +257,8 @@ def build_report(n: dict, profile: dict, opts) -> str:
         g = profile["github"]
         L.append("[6] GITHUB")
         L.append(f"  User     : {g.get('login')}")
-        L.append(f"  Nama     : {g.get('name') or '—'}")
-        L.append(f"  Lokasi   : {g.get('location') or '—'}")
+        L.append(f"  Name     : {g.get('name') or '—'}")
+        L.append(f"  Location : {g.get('location') or '—'}")
         L.append(f"  Email    : {g.get('email') or '—'}")
         L.append(f"  Blog     : {g.get('blog') or '—'}")
         L.append(f"  Repo     : {g.get('public_repos')} | Followers: {g.get('followers')}")
@@ -244,8 +278,8 @@ def build_report(n: dict, profile: dict, opts) -> str:
         e = profile["email"]
         L.append("[8] EMAIL ENRICHMENT")
         L.append(f"  Domain   : {e.get('domain') or '—'}")
-        L.append(f"  Disposable: {'ya' if e.get('is_disposable') else 'tidak'}")
-        L.append(f"  Free mail : {'ya' if e.get('is_free') else 'tidak'}")
+        L.append(f"  Disposable: {'yes' if e.get('is_disposable') else 'no'}")
+        L.append(f"  Free mail : {'yes' if e.get('is_free') else 'no'}")
         if e.get("gravatar"):
             L.append(f"  Gravatar : {e['gravatar'].get('profile_url')}")
         L.append("")
@@ -258,7 +292,7 @@ def build_report(n: dict, profile: dict, opts) -> str:
     L.append("")
 
     L.append("=" * W)
-    L.append("Legal: tracking tanpa izin = UU PDP + UU ITE. Gunakan utk aset sendiri / izin resmi.")
+    L.append("Legal: only track assets you own or with explicit consent / lawful authorization.")
     L.append("=" * W)
     return "\n".join(L)
 
@@ -268,24 +302,24 @@ def build_report(n: dict, profile: dict, opts) -> str:
 # ---------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description="Phone OSINT toolkit (advanced)")
-    ap.add_argument("number", nargs="?", help="Nomor HP (mis. 081234567890)")
-    ap.add_argument("--out", help="Simpan report ke file")
-    ap.add_argument("--json", action="store_true", help="Output JSON")
-    ap.add_argument("--links", action="store_true", help="Buka link probe di browser")
-    ap.add_argument("--dorks", action="store_true", help="Buka google dork")
-    ap.add_argument("--ip", help="Lookup geo untuk IP ini")
-    ap.add_argument("--username", help="Cek username di banyak platform")
-    ap.add_argument("--github", help="Lookup user GitHub")
-    ap.add_argument("--email", help="Lookup email (gravatar, domain)")
+    ap.add_argument("number", nargs="?", help="Phone number (e.g. 081234567890)")
+    ap.add_argument("--out", help="Save report to file")
+    ap.add_argument("--json", action="store_true", help="JSON output")
+    ap.add_argument("--links", action="store_true", help="Open probe links in browser")
+    ap.add_argument("--dorks", action="store_true", help="Open google dork")
+    ap.add_argument("--ip", help="Geo lookup for this IP")
+    ap.add_argument("--username", help="Check username across platforms")
+    ap.add_argument("--github", help="GitHub user lookup")
+    ap.add_argument("--email", help="Email lookup (gravatar, domain)")
     ap.add_argument("--whois", help="WHOIS domain")
-    ap.add_argument("--dns", action="store_true", help="DNS records untuk --whois domain")
-    ap.add_argument("--subdomain", help="Enumerasi subdomain")
-    ap.add_argument("--exif", help="Analisis EXIF gambar")
-    ap.add_argument("--reverse-image", dest="revimg", help="Generate link reverse image")
+    ap.add_argument("--dns", action="store_true", help="DNS records for --whois domain")
+    ap.add_argument("--subdomain", help="Subdomain enumeration")
+    ap.add_argument("--exif", help="Analyze image EXIF")
+    ap.add_argument("--reverse-image", dest="revimg", help="Generate reverse-image links")
     ap.add_argument("--resolve", action="store_true",
-                    help="Resolve nomor -> akun medsos (Telegram, Truecaller, pivot, search)")
-    ap.add_argument("--dev", help="Lookup profil developer (username) di GitHub/GitLab/PyPI/npm/dll")
-    ap.add_argument("--social", help="Resolve profil medsos via Jina (username)")
+                    help="Resolve number -> social accounts (Telegram, Truecaller, pivot, search)")
+    ap.add_argument("--dev", help="Developer profile lookup (username) on GitHub/GitLab/PyPI/npm/etc")
+    ap.add_argument("--social", help="Resolve social profiles via Jina (username)")
     ap.add_argument("--email-intel", dest="email_intel", help="Intel email (gravatar/PGP/Hudson Rock/HIBP)")
     ap.add_argument("--ipintel", help="IP intelligence (Shodan InternetDB/IPinfo/GreyNoise + AbuseIPDB/Censys opsional)")
     ap.add_argument("--leakcheck", help="Breach/leak lookup (LeakCheck public + HIBP/Snusbase/DeHashed opsional)")
@@ -306,15 +340,15 @@ def main():
     ap.add_argument("--emailrep-key", dest="emailrep_key", default="", help="EmailRep API key")
     ap.add_argument("--hlr-key", help="API key HLR lookup")
     ap.add_argument("--hibp-key", help="API key HIBP")
-    ap.add_argument("--wifi-key", help="API key WiFi geo (opsional)")
-    ap.add_argument("--cell-key", help="API key cell geo (OpenCellID/UnwiredLabs)")
-    ap.add_argument("--mcc", type=int, help="MCC cell (untuk --cell)")
+    ap.add_argument("--wifi-key", help="WiFi geo API key (optional)")
+    ap.add_argument("--cell-key", help="Cell geo API key (OpenCellID/UnwiredLabs)")
+    ap.add_argument("--mcc", type=int, help="Cell MCC (for --cell)")
     ap.add_argument("--mnc", type=int, help="MNC cell")
     ap.add_argument("--lac", type=int, help="LAC cell")
     ap.add_argument("--cid", type=int, help="CID cell")
     opts = ap.parse_args()
 
-    # ==== Modus tool individual ====
+    # ==== Individual tool mode ====
     standalone = {}
 
     if opts.exif:
@@ -351,7 +385,7 @@ def main():
     if opts.business:
         standalone["business"] = business.lookup_all(opts.business, opts.opencorp_token or "", opts.ch_key or "")
 
-    # ==== Modus nomor telepon ====
+    # ==== Phone number mode ====
     profile = {}
     if opts.number:
         n = normalize(opts.number)
@@ -383,15 +417,20 @@ def main():
                     "names": [x.get("Name") for x in bl if x.get("Name")],
                 }
 
-        # resolve nomor -> akun medsos
+        # resolve number -> social accounts
         if opts.resolve:
+            # generate candidate usernames from the number
+            cands = generate_candidates(n["local"], n["intl"])
             resolved = socint.resolve_all(
                 n["intl"], n["local"],
                 truecaller_cookie=opts.tc_cookie,
                 serpapi_key=opts.serp_key,
                 searxng_instance=opts.searxng,
+                usernames=cands,
             )
             profile["resolved"] = resolved
+            # surface the candidate variants used
+            profile["candidate_usernames"] = cands[:20]
 
         profile["confidence"] = confidence_score(profile)
 
@@ -410,7 +449,7 @@ def main():
         else:
             text = build_report(n, profile, opts)
             if opts.resolve and profile.get("resolved"):
-                text += "\n\n" + "=" * 68 + "\nRESOLVE: NOMOR -> AKUN MEDSOS\n" + "=" * 68 + "\n"
+                text += "\n\n" + "=" * 68 + "\nRESOLVE: NUMBER -> SOCIAL ACCOUNTS\n" + "=" * 68 + "\n"
                 text += json.dumps(profile["resolved"], indent=2, ensure_ascii=False, default=str)
             if standalone:
                 text += "\n\n" + "=" * 68 + "\nSTANDALONE TOOL RESULTS\n" + "=" * 68 + "\n"
@@ -419,7 +458,7 @@ def main():
             if opts.out:
                 with open(opts.out, "w", encoding="utf-8") as fh:
                     fh.write(text)
-                print(f"\n[+] Report disimpan: {opts.out}", file=sys.stderr)
+                print(f"\n[+] Report saved: {opts.out}", file=sys.stderr)
 
         if opts.links:
             import webbrowser
@@ -430,7 +469,7 @@ def main():
             webbrowser.open_new_tab("https://www.google.com/search?q=" +
                                     urllib.parse.quote(f'"{n["intl"]}"'))
 
-    # ==== Modus tool-only (tanpa nomor) ====
+    # ==== Tool-only mode (no number) ====
     if standalone and not opts.number:
         if opts.json:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
